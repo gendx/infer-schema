@@ -1,0 +1,13 @@
+{
+    "features": [{
+        "geometry": {
+            "coordinates": [[[number]]],
+            "type": string,
+        },
+        "properties": {
+            "name": string,
+        },
+        "type": string,
+    }],
+    "type": string,
+}

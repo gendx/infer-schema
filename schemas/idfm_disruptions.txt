@@ -1,0 +1,43 @@
+{
+    "disruptions": [{
+        "applicationPeriods": [{
+            "begin": string,
+            "end": string,
+        }],
+        "cause": string,
+        "id": string,
+        "impactedSections": ?[{
+            "from": {
+                "id": string,
+                "name": string,
+                "type": string,
+            },
+            "lineId": string,
+            "to": {
+                "id": string,
+                "name": string,
+                "type": string,
+            },
+        }],
+        "lastUpdate": string,
+        "message": string,
+        "severity": string,
+        "shortMessage": ?string,
+        "tags": ?[string],
+        "title": string,
+    }],
+    "lastUpdatedDate": string,
+    "lines": [{
+        "id": string,
+        "impactedObjects": [{
+            "disruptionIds": [string],
+            "id": string,
+            "name": string,
+            "type": string,
+        }],
+        "mode": string,
+        "name": string,
+        "networkId": string,
+        "shortName": string,
+    }],
+}

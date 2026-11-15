@@ -22,7 +22,7 @@ pub struct Schema {
 impl Debug for Schema {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.nullable {
-            fmt.write_str("*")?;
+            fmt.write_str("?")?;
         }
         match self.types.len() {
             0 => fmt.write_str("unknown"),
@@ -58,21 +58,23 @@ impl Schema {
                 fits_i64: x.is_i64(),
             }),
             Value::String(_) => Schema::new(Type::String),
-            Value::Array(a) => Schema::new(Type::Array(
-                a.iter()
-                    .map(Schema::infer)
-                    .reduce(Schema::unify)
-                    .unwrap_or(Schema {
-                        nullable: false,
-                        types: Vec::new(),
-                    }),
-            )),
+            Value::Array(a) => {
+                Schema::new(Type::Array(Schema::unify_all(a.iter().map(Schema::infer))))
+            }
             Value::Object(o) => Schema::new(Type::Object(
                 o.iter()
                     .map(|(k, v)| (k.clone(), Schema::infer(v)))
                     .collect(),
             )),
         }
+    }
+
+    /// Converts objects with at least `threshold` keys into maps.
+    pub fn merge_maps(&mut self, threshold: usize) -> bool {
+        self.types
+            .iter_mut()
+            .map(|typ| typ.merge_maps(threshold))
+            .fold(false, |x, y| x | y)
     }
 
     /// Creates a schema for the given non-null type.
@@ -88,6 +90,14 @@ impl Schema {
         Schema {
             nullable: true,
             types: vec![typ],
+        }
+    }
+
+    /// Creates a schema for an unknown type.
+    pub fn unknown() -> Self {
+        Schema {
+            nullable: false,
+            types: vec![],
         }
     }
 
@@ -147,7 +157,7 @@ impl Schema {
 
     /// Unifies the given schemas.
     pub fn unify_all(schemas: impl Iterator<Item = Self>) -> Self {
-        schemas.reduce(Self::unify).unwrap_or(Self::null())
+        schemas.reduce(Schema::unify).unwrap_or(Schema::unknown())
     }
 }
 
@@ -169,6 +179,8 @@ pub enum Type {
     Bytes,
     /// Array.
     Array(Schema),
+    /// Map.
+    Map(Schema),
     /// Object.
     Object(HashMap<String, Schema>),
 }
@@ -196,6 +208,11 @@ impl Debug for Type {
                 a.fmt(fmt)?;
                 fmt.write_str("]")
             }
+            Type::Map(m) => {
+                fmt.write_str("{string -> ")?;
+                m.fmt(fmt)?;
+                fmt.write_str("}")
+            }
             Type::Object(o) => {
                 let mut entries: Vec<_> = o.iter().collect();
                 entries.sort_by_key(|&(k, _)| k);
@@ -214,7 +231,31 @@ impl Type {
             Type::String => 2,
             Type::Bytes => 3,
             Type::Array(_) => 4,
-            Type::Object(_) => 5,
+            Type::Map(_) => 5,
+            Type::Object(_) => 6,
+        }
+    }
+
+    /// Converts objects with at least `threshold` keys into maps.
+    pub fn merge_maps(&mut self, threshold: usize) -> bool {
+        match self {
+            Type::Bool | Type::Number { .. } | Type::String | Type::Bytes => false,
+            Type::Array(schema) | Type::Map(schema) => schema.merge_maps(threshold),
+            Type::Object(map) => {
+                if map.len() < threshold {
+                    map.values_mut()
+                        .map(|v| v.merge_maps(threshold))
+                        .fold(false, |a, b| a | b)
+                } else {
+                    let mut extracted = HashMap::new();
+                    std::mem::swap(map, &mut extracted);
+
+                    let mut schema = Schema::unify_all(extracted.into_values());
+                    schema.merge_maps(threshold);
+                    *self = Type::Map(schema);
+                    true
+                }
+            }
         }
     }
 
@@ -306,6 +347,7 @@ impl Type {
             (Type::String, Type::String) => Ok(Type::String),
             (Type::Bytes, Type::Bytes) => Ok(Type::Bytes),
             (Type::Array(a), Type::Array(b)) => Ok(Type::Array(Schema::unify(a, b))),
+            (Type::Map(a), Type::Map(b)) => Ok(Type::Map(Schema::unify(a, b))),
             (Type::Object(o), Type::Object(p)) => {
                 let mut tmp: HashMap<String, (Schema, bool)> =
                     o.into_iter().map(|(k, v)| (k, (v, false))).collect();
@@ -380,11 +422,11 @@ mod test {
         assert_eq!(format!("{:#?}", Type::array(Type::Bool)), "[bool]");
         assert_eq!(
             format!("{:?}", Type::array_nullable(Type::integer())),
-            "[*uint]"
+            "[?uint]"
         );
         assert_eq!(
             format!("{:#?}", Type::array_nullable(Type::integer())),
-            "[*uint]"
+            "[?uint]"
         );
     }
 
@@ -398,14 +440,14 @@ mod test {
         ]));
         assert_eq!(
             format!("{:?}", schema),
-            r#"{"apple": uint, "banana": bool, "cherry": *unknown, "date": string}"#
+            r#"{"apple": uint, "banana": bool, "cherry": ?unknown, "date": string}"#
         );
         assert_eq!(
             format!("{:#?}", schema),
             r#"{
     "apple": uint,
     "banana": bool,
-    "cherry": *unknown,
+    "cherry": ?unknown,
     "date": string,
 }"#
         );
@@ -419,8 +461,8 @@ mod test {
 
         let schema =
             Schema::variants_nullable([Type::Bool, Type::integer(), Type::array(Type::Bool)]);
-        assert_eq!(format!("{:?}", schema), "*(bool | uint | [bool])");
-        assert_eq!(format!("{:#?}", schema), "*(bool | uint | [bool])");
+        assert_eq!(format!("{:?}", schema), "?(bool | uint | [bool])");
+        assert_eq!(format!("{:#?}", schema), "?(bool | uint | [bool])");
     }
 
     #[test]
@@ -449,18 +491,18 @@ mod test {
         ]));
         assert_eq!(
             format!("{:?}", schema),
-            r#"{"apple": *(bool | uint), "banana": [bool], "cherry": [*string], "date": {"eggplant": *[uint]}, "fig": [*{"hazelnut": bool}]}"#
+            r#"{"apple": ?(bool | uint), "banana": [bool], "cherry": [?string], "date": {"eggplant": ?[uint]}, "fig": [?{"hazelnut": bool}]}"#
         );
         assert_eq!(
             format!("{:#?}", schema),
             r#"{
-    "apple": *(bool | uint),
+    "apple": ?(bool | uint),
     "banana": [bool],
-    "cherry": [*string],
+    "cherry": [?string],
     "date": {
-        "eggplant": *[uint],
+        "eggplant": ?[uint],
     },
-    "fig": [*{
+    "fig": [?{
         "hazelnut": bool,
     }],
 }"#

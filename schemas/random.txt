@@ -1,0 +1,22 @@
+{
+    "id": uint,
+    "jsonrpc": string,
+    "result": [{
+        "admin": bool,
+        "age": uint,
+        "avatar": string,
+        "birthDate": string,
+        "company": string,
+        "email": string,
+        "field": string,
+        "friends": [{
+            "id": uint,
+            "name": string,
+            "phone": string,
+        }],
+        "id": uint,
+        "name": string,
+        "phone": string,
+    }],
+    "total": uint,
+}

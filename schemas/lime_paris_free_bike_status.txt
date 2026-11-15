@@ -1,0 +1,19 @@
+{
+    "data": {
+        "bikes": [{
+            "_child_seat": ?bool,
+            "bike_id": string,
+            "current_range_meters": uint,
+            "is_disabled": bool,
+            "is_reserved": bool,
+            "last_reported": uint,
+            "lat": number,
+            "lon": number,
+            "vehicle_type": string,
+            "vehicle_type_id": string,
+        }],
+    },
+    "last_updated": uint,
+    "ttl": uint,
+    "version": string,
+}

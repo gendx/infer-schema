@@ -1,0 +1,14 @@
+{
+    "batches": [{
+        "indexRange": [uint],
+        "usedBones": [uint],
+        "vertexRange": [uint],
+    }],
+    "colors": [uint],
+    "indices": [uint],
+    "influences": [[number]],
+    "morphTargets": {},
+    "normals": [number],
+    "positions": [number],
+    "tex0": [number],
+}

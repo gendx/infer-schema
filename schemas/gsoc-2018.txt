@@ -1,0 +1,18 @@
+{string -> {
+    "@context": string,
+    "@type": string,
+    "author": {
+        "@type": string,
+        "name": string,
+    },
+    "description": string,
+    "name": string,
+    "sponsor": {
+        "@type": string,
+        "description": string,
+        "disambiguatingDescription": string,
+        "logo": string,
+        "name": string,
+        "url": string,
+    },
+}}

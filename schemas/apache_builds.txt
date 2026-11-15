@@ -1,0 +1,27 @@
+{
+    "assignedLabels": [{}],
+    "description": string,
+    "jobs": [{
+        "color": string,
+        "name": string,
+        "url": string,
+    }],
+    "mode": string,
+    "nodeDescription": string,
+    "nodeName": string,
+    "numExecutors": uint,
+    "overallLoad": {},
+    "primaryView": {
+        "name": string,
+        "url": string,
+    },
+    "quietingDown": bool,
+    "slaveAgentPort": uint,
+    "unlabeledLoad": {},
+    "useCrumbs": bool,
+    "useSecurity": bool,
+    "views": [{
+        "name": string,
+        "url": string,
+    }],
+}

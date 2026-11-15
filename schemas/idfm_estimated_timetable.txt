@@ -1,0 +1,105 @@
+{
+    "Siri": {
+        "ServiceDelivery": {
+            "EstimatedTimetableDelivery": [{
+                "EstimatedJourneyVersionFrame": [{
+                    "EstimatedVehicleJourney": [{
+                        "DatedVehicleJourneyRef": {
+                            "value": string,
+                        },
+                        "DestinationName": [{
+                            "value": string,
+                        }],
+                        "DestinationRef": {
+                            "value": string,
+                        },
+                        "DestinationShortName": ?[{
+                            "value": string,
+                        }],
+                        "DirectionName": [{
+                            "value": string,
+                        }],
+                        "DirectionRef": ?{
+                            "value": string,
+                        },
+                        "EstimatedCalls": {
+                            "EstimatedCall": [{
+                                "AimedArrivalTime": ?string,
+                                "AimedDepartureTime": ?string,
+                                "ArrivalPlatformName": ?{
+                                    "value": string,
+                                },
+                                "ArrivalProximityText": ?{
+                                    "value": string,
+                                },
+                                "ArrivalStatus": ?string,
+                                "ArrivalStopAssignment": ?{
+                                    "ExpectedQuayRef": {
+                                        "value": string,
+                                    },
+                                },
+                                "CallNote": ?[{
+                                    "value": string,
+                                }],
+                                "DeparturePlatformName": ?{
+                                    "value": string,
+                                },
+                                "DepartureStatus": ?string,
+                                "DepartureStopAssignment": ?{
+                                    "ExpectedQuayRef": {
+                                        "value": string,
+                                    },
+                                },
+                                "DestinationDisplay": [{
+                                    "value": string,
+                                }],
+                                "ExpectedArrivalTime": ?string,
+                                "ExpectedDepartureTime": ?string,
+                                "StopPointRef": {
+                                    "value": string,
+                                },
+                            }],
+                        },
+                        "FirstOrLastJourney": ?{
+                            "value": string,
+                        },
+                        "JourneyNote": [{
+                            "value": string,
+                        }],
+                        "LineRef": {
+                            "value": string,
+                        },
+                        "OperatorRef": {
+                            "value": ?string,
+                        },
+                        "OriginName": [{
+                            "value": string,
+                        }],
+                        "OriginRef": {
+                            "value": ?string,
+                        },
+                        "ProductCategoryRef": {},
+                        "PublishedLineName": [{
+                            "value": string,
+                        }],
+                        "RecordedAtTime": string,
+                        "RouteRef": {
+                            "value": ?string,
+                        },
+                        "VehicleFeatureRef": [string],
+                        "VehicleJourneyName": [{
+                            "value": string,
+                        }],
+                        "VehicleMode": [string],
+                    }],
+                }],
+                "ResponseTimestamp": string,
+                "Status": string,
+                "Version": string,
+            }],
+            "ProducerRef": string,
+            "ResponseMessageIdentifier": string,
+            "ResponseTimestamp": string,
+        },
+    },
+}

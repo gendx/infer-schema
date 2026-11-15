@@ -21,3 +21,11 @@ serde-json = ["dep:serde_json"]
 
 [dependencies]
 serde_json = { optional = true, version = "1.0.154" }
+
+[dev-dependencies]
+anyhow = "1.0.104"
+rstest = { version = "0.28.0", default-features = false }
+
+[[test]]
+name = "integration"
+required-features = ["serde-json"]
