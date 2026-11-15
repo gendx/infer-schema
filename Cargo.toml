@@ -1,0 +1,23 @@
+[package]
+name = "infer-schema"
+description = "Infer a data schema from example values"
+version = "0.1.0"
+authors = ["Guillaume Endignoux <ggendx@gmail.com>"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/gendx/infer-schema"
+categories = ["algorithms", "data-structures", "development-tools", "encoding", "parsing"]
+keywords = ["type-inference", "json"]
+exclude = [".github/*", "data/*", "schemas/*"]
+edition = "2024"
+rust-version = "1.85.0"
+
+[package.metadata.docs.rs]
+features = ["serde-json"]
+rustdoc-args = ["--cfg", "docsrs", "--generate-link-to-definition"]
+
+[features]
+default = []
+serde-json = ["dep:serde_json"]
+
+[dependencies]
+serde_json = { optional = true, version = "1.0.154" }
