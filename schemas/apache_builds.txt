@@ -1,19 +1,19 @@
 {
     "assignedLabels": [{}],
-    "description": string,
+    "description": string (len = [min: 447, avg: 447, max: 447]),
     "jobs": [{
-        "color": string,
-        "name": string,
-        "url": string,
+        "color": string (len = [min: 3, avg: 4, max: 13]),
+        "name": string (len = [min: 2, avg: 19, max: 77]),
+        "url": string (len = [min: 33, avg: 50, max: 108]),
     }],
-    "mode": string,
-    "nodeDescription": string,
-    "nodeName": string,
+    "mode": string (len = [min: 9, avg: 9, max: 9]),
+    "nodeDescription": string (len = [min: 23, avg: 23, max: 23]),
+    "nodeName": string (len = [min: 0, avg: 0, max: 0]),
     "numExecutors": uint,
     "overallLoad": {},
     "primaryView": {
-        "name": string,
-        "url": string,
+        "name": string (len = [min: 3, avg: 3, max: 3]),
+        "url": string (len = [min: 26, avg: 26, max: 26]),
     },
     "quietingDown": bool,
     "slaveAgentPort": uint,
@@ -21,7 +21,7 @@
     "useCrumbs": bool,
     "useSecurity": bool,
     "views": [{
-        "name": string,
-        "url": string,
+        "name": string (len = [min: 3, avg: 6, max: 10]),
+        "url": string (len = [min: 26, avg: 35, max: 42]),
     }],
 }

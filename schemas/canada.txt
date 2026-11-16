@@ -2,12 +2,12 @@
     "features": [{
         "geometry": {
             "coordinates": [[[number]]],
-            "type": string,
+            "type": string (len = [min: 7, avg: 7, max: 7]),
         },
         "properties": {
-            "name": string,
+            "name": string (len = [min: 6, avg: 6, max: 6]),
         },
-        "type": string,
+        "type": string (len = [min: 7, avg: 7, max: 7]),
     }],
-    "type": string,
+    "type": string (len = [min: 17, avg: 17, max: 17]),
 }

@@ -2,18 +2,18 @@
     "data": {
         "bikes": [{
             "_child_seat": ?bool,
-            "bike_id": string,
+            "bike_id": string (len = [min: 36, avg: 36, max: 36]),
             "current_range_meters": uint,
             "is_disabled": bool,
             "is_reserved": bool,
             "last_reported": uint,
             "lat": number,
             "lon": number,
-            "vehicle_type": string,
-            "vehicle_type_id": string,
+            "vehicle_type": string (len = [min: 6, avg: 6, max: 6]),
+            "vehicle_type_id": string (len = [min: 1, avg: 1, max: 1]),
         }],
     },
     "last_updated": uint,
     "ttl": uint,
-    "version": string,
+    "version": string (len = [min: 3, avg: 3, max: 3]),
 }

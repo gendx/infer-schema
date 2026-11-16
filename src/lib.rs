@@ -9,6 +9,7 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 use std::fmt::Debug;
+use std::ops::Add;
 
 /// Schema representing a top-level value. This combines a set of possible
 /// [`Type`] variants with a nullability flag. This is also the inner type of an
@@ -57,7 +58,7 @@ impl Schema {
                 fits_u64: x.is_u64(),
                 fits_i64: x.is_i64(),
             }),
-            Value::String(_) => Schema::new(Type::String),
+            Value::String(s) => Schema::new(Type::string(s)),
             Value::Array(a) => {
                 Schema::new(Type::Array(Schema::unify_all(a.iter().map(Schema::infer))))
             }
@@ -174,7 +175,12 @@ pub enum Type {
         fits_i64: bool,
     },
     /// UTF-8 string.
-    String,
+    String {
+        /// Number of observed values.
+        count: usize,
+        /// Statistics about the string length.
+        len: Stats<usize>,
+    },
     /// Byte array.
     Bytes,
     /// Array.
@@ -183,6 +189,42 @@ pub enum Type {
     Map(Schema),
     /// Object.
     Object(HashMap<String, Schema>),
+}
+
+/// Statistics about observed values.
+#[derive(Clone, PartialEq, Eq)]
+pub struct Stats<T> {
+    /// Minimum value.
+    pub min: T,
+    /// Maximum value.
+    pub max: T,
+    /// Sum of values.
+    pub sum: T,
+}
+
+impl<T: Copy> Stats<T> {
+    fn new(t: T) -> Self {
+        Self {
+            min: t,
+            max: t,
+            sum: t,
+        }
+    }
+}
+
+impl<T> Add for Stats<T>
+where
+    T: Add<Output = T> + Ord,
+{
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self {
+        Self {
+            min: self.min.min(other.min),
+            max: self.max.max(other.max),
+            sum: self.sum + other.sum,
+        }
+    }
 }
 
 impl Debug for Type {
@@ -201,7 +243,12 @@ impl Debug for Type {
                 fits_u64: false,
                 fits_i64: false,
             } => fmt.write_str("number"),
-            Type::String => fmt.write_str("string"),
+            Type::String { count, len } => fmt.write_fmt(format_args!(
+                "string (len = [min: {}, avg: {}, max: {}])",
+                len.min,
+                len.sum / count,
+                len.max
+            )),
             Type::Bytes => fmt.write_str("bytes"),
             Type::Array(a) => {
                 fmt.write_str("[")?;
@@ -228,7 +275,7 @@ impl Type {
         match self {
             Type::Bool => 0,
             Type::Number { .. } => 1,
-            Type::String => 2,
+            Type::String { .. } => 2,
             Type::Bytes => 3,
             Type::Array(_) => 4,
             Type::Map(_) => 5,
@@ -239,7 +286,7 @@ impl Type {
     /// Converts objects with at least `threshold` keys into maps.
     pub fn merge_maps(&mut self, threshold: usize) -> bool {
         match self {
-            Type::Bool | Type::Number { .. } | Type::String | Type::Bytes => false,
+            Type::Bool | Type::Number { .. } | Type::String { .. } | Type::Bytes => false,
             Type::Array(schema) | Type::Map(schema) => schema.merge_maps(threshold),
             Type::Object(map) => {
                 if map.len() < threshold {
@@ -285,8 +332,11 @@ impl Type {
     }
 
     /// Creates a type that contains the given value.
-    pub fn string(_: &str) -> Self {
-        Type::String
+    pub fn string(s: &str) -> Self {
+        Type::String {
+            count: 1,
+            len: Stats::new(s.len()),
+        }
     }
 
     /// Creates a type that contains the given value.
@@ -344,7 +394,19 @@ impl Type {
                 fits_u64: a_u64 && b_u64,
                 fits_i64: a_i64 && b_i64,
             }),
-            (Type::String, Type::String) => Ok(Type::String),
+            (
+                Type::String {
+                    count: count1,
+                    len: len1,
+                },
+                Type::String {
+                    count: count2,
+                    len: len2,
+                },
+            ) => Ok(Type::String {
+                count: count1 + count2,
+                len: len1 + len2,
+            }),
             (Type::Bytes, Type::Bytes) => Ok(Type::Bytes),
             (Type::Array(a), Type::Array(b)) => Ok(Type::Array(Schema::unify(a, b))),
             (Type::Map(a), Type::Map(b)) => Ok(Type::Map(Schema::unify(a, b))),
@@ -412,7 +474,20 @@ mod test {
     fn test_debug_base_types() {
         assert_eq!(format!("{:?}", Type::Bool), "bool");
         assert_eq!(format!("{:?}", Type::integer()), "uint");
-        assert_eq!(format!("{:?}", Type::String), "string");
+        assert_eq!(
+            format!(
+                "{:?}",
+                Type::String {
+                    count: 5,
+                    len: Stats {
+                        min: 10,
+                        max: 20,
+                        sum: 75
+                    },
+                }
+            ),
+            "string (len = [min: 10, avg: 15, max: 20])"
+        );
         assert_eq!(format!("{:?}", Type::Bytes), "bytes");
     }
 
@@ -436,11 +511,21 @@ mod test {
             ("apple", Schema::new(Type::integer())),
             ("banana", Schema::new(Type::Bool)),
             ("cherry", Schema::null()),
-            ("date", Schema::new(Type::String)),
+            (
+                "date",
+                Schema::new(Type::String {
+                    count: 5,
+                    len: Stats {
+                        min: 10,
+                        max: 20,
+                        sum: 75,
+                    },
+                }),
+            ),
         ]));
         assert_eq!(
             format!("{:?}", schema),
-            r#"{"apple": uint, "banana": bool, "cherry": ?unknown, "date": string}"#
+            r#"{"apple": uint, "banana": bool, "cherry": ?unknown, "date": string (len = [min: 10, avg: 15, max: 20])}"#
         );
         assert_eq!(
             format!("{:#?}", schema),
@@ -448,7 +533,7 @@ mod test {
     "apple": uint,
     "banana": bool,
     "cherry": ?unknown,
-    "date": string,
+    "date": string (len = [min: 10, avg: 15, max: 20]),
 }"#
         );
     }
@@ -473,7 +558,17 @@ mod test {
                 Schema::variants_nullable([Type::Bool, Type::integer()]),
             ),
             ("banana", Schema::new(Type::array(Type::Bool))),
-            ("cherry", Schema::new(Type::array_nullable(Type::String))),
+            (
+                "cherry",
+                Schema::new(Type::array_nullable(Type::String {
+                    count: 5,
+                    len: Stats {
+                        min: 10,
+                        max: 20,
+                        sum: 75,
+                    },
+                })),
+            ),
             (
                 "date",
                 Schema::new(Type::object([(
@@ -491,14 +586,14 @@ mod test {
         ]));
         assert_eq!(
             format!("{:?}", schema),
-            r#"{"apple": ?(bool | uint), "banana": [bool], "cherry": [?string], "date": {"eggplant": ?[uint]}, "fig": [?{"hazelnut": bool}]}"#
+            r#"{"apple": ?(bool | uint), "banana": [bool], "cherry": [?string (len = [min: 10, avg: 15, max: 20])], "date": {"eggplant": ?[uint]}, "fig": [?{"hazelnut": bool}]}"#
         );
         assert_eq!(
             format!("{:#?}", schema),
             r#"{
     "apple": ?(bool | uint),
     "banana": [bool],
-    "cherry": [?string],
+    "cherry": [?string (len = [min: 10, avg: 15, max: 20])],
     "date": {
         "eggplant": ?[uint],
     },

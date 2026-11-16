@@ -5,101 +5,101 @@
                 "EstimatedJourneyVersionFrame": [{
                     "EstimatedVehicleJourney": [{
                         "DatedVehicleJourneyRef": {
-                            "value": string,
+                            "value": string (len = [min: 27, avg: 43, max: 73]),
                         },
                         "DestinationName": [{
-                            "value": string,
+                            "value": string (len = [min: 2, avg: 19, max: 56]),
                         }],
                         "DestinationRef": {
-                            "value": string,
+                            "value": string (len = [min: 21, avg: 23, max: 73]),
                         },
                         "DestinationShortName": ?[{
-                            "value": string,
+                            "value": string (len = [min: 5, avg: 14, max: 51]),
                         }],
                         "DirectionName": [{
-                            "value": string,
+                            "value": string (len = [min: 1, avg: 10, max: 78]),
                         }],
                         "DirectionRef": ?{
-                            "value": string,
+                            "value": string (len = [min: 0, avg: 5, max: 8]),
                         },
                         "EstimatedCalls": {
                             "EstimatedCall": [{
-                                "AimedArrivalTime": ?string,
-                                "AimedDepartureTime": ?string,
+                                "AimedArrivalTime": ?string (len = [min: 24, avg: 24, max: 24]),
+                                "AimedDepartureTime": ?string (len = [min: 24, avg: 24, max: 24]),
                                 "ArrivalPlatformName": ?{
-                                    "value": string,
+                                    "value": string (len = [min: 1, avg: 1, max: 7]),
                                 },
                                 "ArrivalProximityText": ?{
-                                    "value": string,
+                                    "value": string (len = [min: 12, avg: 12, max: 13]),
                                 },
-                                "ArrivalStatus": ?string,
+                                "ArrivalStatus": ?string (len = [min: 5, avg: 7, max: 9]),
                                 "ArrivalStopAssignment": ?{
                                     "ExpectedQuayRef": {
-                                        "value": string,
+                                        "value": string (len = [min: 24, avg: 24, max: 24]),
                                     },
                                 },
                                 "CallNote": ?[{
-                                    "value": string,
+                                    "value": string (len = [min: 14, avg: 16, max: 20]),
                                 }],
                                 "DeparturePlatformName": ?{
-                                    "value": string,
+                                    "value": string (len = [min: 1, avg: 1, max: 7]),
                                 },
-                                "DepartureStatus": ?string,
+                                "DepartureStatus": ?string (len = [min: 5, avg: 7, max: 9]),
                                 "DepartureStopAssignment": ?{
                                     "ExpectedQuayRef": {
-                                        "value": string,
+                                        "value": string (len = [min: 24, avg: 24, max: 24]),
                                     },
                                 },
                                 "DestinationDisplay": [{
-                                    "value": string,
+                                    "value": string (len = [min: 2, avg: 17, max: 53]),
                                 }],
-                                "ExpectedArrivalTime": ?string,
-                                "ExpectedDepartureTime": ?string,
+                                "ExpectedArrivalTime": ?string (len = [min: 24, avg: 24, max: 24]),
+                                "ExpectedDepartureTime": ?string (len = [min: 24, avg: 24, max: 24]),
                                 "StopPointRef": {
-                                    "value": string,
+                                    "value": string (len = [min: 22, avg: 23, max: 33]),
                                 },
                             }],
                         },
                         "FirstOrLastJourney": ?{
-                            "value": string,
+                            "value": string (len = [min: 19, avg: 19, max: 20]),
                         },
                         "JourneyNote": [{
-                            "value": string,
+                            "value": string (len = [min: 1, avg: 8, max: 41]),
                         }],
                         "LineRef": {
-                            "value": string,
+                            "value": string (len = [min: 18, avg: 18, max: 18]),
                         },
                         "OperatorRef": {
-                            "value": ?string,
+                            "value": ?string (len = [min: 18, avg: 26, max: 52]),
                         },
                         "OriginName": [{
-                            "value": string,
+                            "value": string (len = [min: 2, avg: 17, max: 50]),
                         }],
                         "OriginRef": {
-                            "value": ?string,
+                            "value": ?string (len = [min: 22, avg: 23, max: 73]),
                         },
                         "ProductCategoryRef": {},
                         "PublishedLineName": [{
-                            "value": string,
+                            "value": string (len = [min: 1, avg: 3, max: 30]),
                         }],
-                        "RecordedAtTime": string,
+                        "RecordedAtTime": string (len = [min: 24, avg: 24, max: 24]),
                         "RouteRef": {
-                            "value": ?string,
+                            "value": ?string (len = [min: 24, avg: 34, max: 62]),
                         },
-                        "VehicleFeatureRef": [string],
+                        "VehicleFeatureRef": [string (len = [min: 9, avg: 9, max: 10])],
                         "VehicleJourneyName": [{
-                            "value": string,
+                            "value": string (len = [min: 2, avg: 6, max: 13]),
                         }],
-                        "VehicleMode": [string],
+                        "VehicleMode": [string (len = [min: 3, avg: 3, max: 5])],
                     }],
                 }],
-                "ResponseTimestamp": string,
-                "Status": string,
-                "Version": string,
+                "ResponseTimestamp": string (len = [min: 24, avg: 24, max: 24]),
+                "Status": string (len = [min: 4, avg: 4, max: 4]),
+                "Version": string (len = [min: 3, avg: 3, max: 3]),
             }],
-            "ProducerRef": string,
-            "ResponseMessageIdentifier": string,
-            "ResponseTimestamp": string,
+            "ProducerRef": string (len = [min: 8, avg: 8, max: 8]),
+            "ResponseMessageIdentifier": string (len = [min: 66, avg: 66, max: 66]),
+            "ResponseTimestamp": string (len = [min: 24, avg: 24, max: 24]),
         },
     },
 }
