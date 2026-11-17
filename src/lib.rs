@@ -176,9 +176,9 @@ pub enum Type {
     /// UTF-8 string.
     String {
         /// Number of observed values.
-        count: usize,
+        count: u64,
         /// Statistics about the string length.
-        len: Stats<usize>,
+        len: Stats,
     },
     /// Byte array.
     Bytes,
@@ -192,29 +192,26 @@ pub enum Type {
 
 /// Statistics about observed values.
 #[derive(Clone, PartialEq, Eq)]
-pub struct Stats<T> {
+pub struct Stats {
     /// Minimum value.
-    pub min: T,
+    pub min: u64,
     /// Maximum value.
-    pub max: T,
+    pub max: u64,
     /// Sum of values.
-    pub sum: T,
+    pub sum: u128,
 }
 
-impl<T: Copy> Stats<T> {
-    fn new(t: T) -> Self {
+impl Stats {
+    fn new(t: u64) -> Self {
         Self {
             min: t,
             max: t,
-            sum: t,
+            sum: t.into(),
         }
     }
 }
 
-impl<T> Add for Stats<T>
-where
-    T: Add<Output = T> + Ord,
-{
+impl Add for Stats {
     type Output = Self;
 
     fn add(self, other: Self) -> Self {
@@ -245,7 +242,7 @@ impl Debug for Type {
             Type::String { count, len } => fmt.write_fmt(format_args!(
                 "string (len = [min: {}, avg: {}, max: {}])",
                 len.min,
-                len.sum / count,
+                len.sum / *count as u128,
                 len.max
             )),
             Type::Bytes => fmt.write_str("bytes"),
@@ -334,7 +331,7 @@ impl Type {
     pub fn string(s: &str) -> Self {
         Type::String {
             count: 1,
-            len: Stats::new(s.len()),
+            len: Stats::new(s.len() as u64),
         }
     }
 
@@ -377,6 +374,7 @@ impl Type {
 
     /// Attempts to unify two primitive types. If the types are incompatible, an
     /// error containing the inputs is returned.
+    #[expect(clippy::result_large_err)]
     fn unify(x: Self, y: Self) -> Result<Self, (Self, Self)> {
         match (x, y) {
             (Type::Bool, Type::Bool) => Ok(Type::Bool),
