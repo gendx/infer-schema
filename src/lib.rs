@@ -9,13 +9,13 @@ use smallvec::{SmallVec, smallvec};
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 use std::ops::Add;
 
 /// Schema representing a top-level value. This combines a set of possible
 /// [`Type`] variants with a nullability flag. This is also the inner type of an
 /// array and of an object value.
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq)]
 pub struct Schema {
     nullable: bool,
     types: SmallVec<[Type; 1]>,
@@ -55,9 +55,12 @@ impl Schema {
         match value {
             Value::Null => Schema::null(),
             Value::Bool(x) => Schema::new(Type::bool(*x)),
-            Value::Number(x) => Schema::new(Type::Number {
-                fits_u64: x.is_u64(),
-                fits_i64: x.is_i64(),
+            Value::Number(x) => Schema::new(if let Some(u) = x.as_u64() {
+                Type::u64(u)
+            } else if let Some(i) = x.as_i64() {
+                Type::i64(i)
+            } else {
+                Type::f64(x.as_f64().unwrap())
             }),
             Value::String(s) => Schema::new(Type::string(s)),
             Value::Array(a) => Schema::new(Type::Array(Box::new(Schema::unify_all(
@@ -162,7 +165,7 @@ impl Schema {
 }
 
 /// A primitive type.
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq)]
 pub enum Type {
     /// Boolean.
     Bool {
@@ -173,10 +176,18 @@ pub enum Type {
     },
     /// Number.
     Number {
+        /// Number of observed values.
+        count: u64,
         /// Whether this number fits in a [`u64`].
         fits_u64: bool,
-        /// Whether this number fits in a [`i64`].
-        fits_i64: bool,
+        /// Whether this number fits in an integer.
+        fits_integer: bool,
+        /// Minimum value.
+        min: Number64,
+        /// Maximum value.
+        max: Number64,
+        /// Sum of values.
+        sum: Number128,
     },
     /// UTF-8 string.
     String {
@@ -193,6 +204,106 @@ pub enum Type {
     Map(Box<Schema>),
     /// Object.
     Object(HashMap<String, Schema>),
+}
+
+/// 64-bit number value.
+#[derive(Clone, Copy, PartialEq)]
+pub enum Number64 {
+    /// Unsigned integer.
+    U64(u64),
+    /// Signed integer.
+    I64(i64),
+    /// Floating-point value.
+    F64(f64),
+}
+
+impl Display for Number64 {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Number64::U64(x) => Display::fmt(x, fmt),
+            Number64::I64(x) => Display::fmt(x, fmt),
+            Number64::F64(x) => Display::fmt(x, fmt),
+        }
+    }
+}
+
+impl Number64 {
+    fn min(self, other: Self) -> Self {
+        match (self, other) {
+            (Number64::U64(x), Number64::U64(y)) => Number64::U64(x.min(y)),
+            (Number64::I64(x), Number64::I64(y)) => Number64::I64(x.min(y)),
+            (Number64::I64(x), Number64::U64(y)) => Number64::I64(x.min(y as i64)),
+            (Number64::U64(x), Number64::I64(y)) => Number64::I64((x as i64).min(y)),
+            (Number64::F64(x), Number64::F64(y)) => Number64::F64(x.min(y)),
+            (Number64::F64(x), Number64::U64(y)) => Number64::F64(x.min(y as f64)),
+            (Number64::F64(x), Number64::I64(y)) => Number64::F64(x.min(y as f64)),
+            (Number64::U64(x), Number64::F64(y)) => Number64::F64((x as f64).min(y)),
+            (Number64::I64(x), Number64::F64(y)) => Number64::F64((x as f64).min(y)),
+        }
+    }
+
+    fn max(self, other: Self) -> Self {
+        match (self, other) {
+            (Number64::U64(x), Number64::U64(y)) => Number64::U64(x.max(y)),
+            (Number64::I64(x), Number64::I64(y)) => Number64::I64(x.max(y)),
+            (Number64::I64(x), Number64::U64(y)) => Number64::I64(x.max(y as i64)),
+            (Number64::U64(x), Number64::I64(y)) => Number64::I64((x as i64).max(y)),
+            (Number64::F64(x), Number64::F64(y)) => Number64::F64(x.max(y)),
+            (Number64::F64(x), Number64::U64(y)) => Number64::F64(x.max(y as f64)),
+            (Number64::F64(x), Number64::I64(y)) => Number64::F64(x.max(y as f64)),
+            (Number64::U64(x), Number64::F64(y)) => Number64::F64((x as f64).max(y)),
+            (Number64::I64(x), Number64::F64(y)) => Number64::F64((x as f64).max(y)),
+        }
+    }
+}
+
+/// 128-bit number value.
+#[derive(Clone, Copy, PartialEq)]
+pub enum Number128 {
+    /// Unsigned integer.
+    U128(u128),
+    /// Signed integer.
+    I128(i128),
+    /// Floating-point value.
+    F64(f64),
+}
+
+impl Display for Number128 {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Number128::U128(x) => Display::fmt(x, fmt),
+            Number128::I128(x) => Display::fmt(x, fmt),
+            Number128::F64(x) => Display::fmt(x, fmt),
+        }
+    }
+}
+
+impl Number128 {
+    fn average(self, count: u64) -> Self {
+        match self {
+            Number128::U128(x) => Number128::U128(x / count as u128),
+            Number128::I128(x) => Number128::I128(x / count as i128),
+            Number128::F64(x) => Number128::F64(x / count as f64),
+        }
+    }
+}
+
+impl Add for Number128 {
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self {
+        match (self, other) {
+            (Number128::U128(x), Number128::U128(y)) => Number128::U128(x + y),
+            (Number128::I128(x), Number128::I128(y)) => Number128::I128(x + y),
+            (Number128::U128(x), Number128::I128(y)) => Number128::I128(x as i128 + y),
+            (Number128::I128(x), Number128::U128(y)) => Number128::I128(x + y as i128),
+            (Number128::F64(x), Number128::F64(y)) => Number128::F64(x + y),
+            (Number128::F64(x), Number128::U128(y)) => Number128::F64(x + y as f64),
+            (Number128::F64(x), Number128::I128(y)) => Number128::F64(x + y as f64),
+            (Number128::U128(x), Number128::F64(y)) => Number128::F64(x as f64 + y),
+            (Number128::I128(x), Number128::F64(y)) => Number128::F64(x as f64 + y),
+        }
+    }
 }
 
 /// Statistics about observed values.
@@ -240,16 +351,43 @@ impl Debug for Type {
             )),
             Type::Number {
                 fits_u64: true,
-                fits_i64: _,
-            } => fmt.write_str("uint"),
+                fits_integer: _,
+                count,
+                min,
+                max,
+                sum,
+            } => fmt.write_fmt(format_args!(
+                "uint (min: {}, avg: {}, max: {})",
+                min,
+                sum.average(*count),
+                max
+            )),
             Type::Number {
                 fits_u64: false,
-                fits_i64: true,
-            } => fmt.write_str("int"),
+                fits_integer: true,
+                count,
+                min,
+                max,
+                sum,
+            } => fmt.write_fmt(format_args!(
+                "int (min: {}, avg: {}, max: {})",
+                min,
+                sum.average(*count),
+                max
+            )),
             Type::Number {
                 fits_u64: false,
-                fits_i64: false,
-            } => fmt.write_str("number"),
+                fits_integer: false,
+                count,
+                min,
+                max,
+                sum,
+            } => fmt.write_fmt(format_args!(
+                "number (min: {}, avg: {}, max: {})",
+                min,
+                sum.average(*count),
+                max
+            )),
             Type::String { count, len } => fmt.write_fmt(format_args!(
                 "string (len = [min: {}, avg: {}, max: {}])",
                 len.min,
@@ -331,25 +469,48 @@ impl Type {
     /// Creates a type that contains the given value.
     pub fn u64(x: u64) -> Self {
         Type::Number {
+            count: 1,
             fits_u64: true,
-            fits_i64: x <= i64::MAX as u64,
+            fits_integer: true,
+            min: Number64::U64(x),
+            max: Number64::U64(x),
+            sum: Number128::U128(x as u128),
         }
     }
 
     /// Creates a type that contains the given value.
     pub fn i64(x: i64) -> Self {
+        if x >= 0 {
+            return Self::u64(x as u64);
+        }
         Type::Number {
-            fits_u64: x >= 0,
-            fits_i64: true,
+            count: 1,
+            fits_u64: false,
+            fits_integer: true,
+            min: Number64::I64(x),
+            max: Number64::I64(x),
+            sum: Number128::I128(x as i128),
         }
     }
 
     /// Creates a type that contains the given value.
     pub fn f64(x: f64) -> Self {
         let integer = x.fract() == 0.0;
+        if integer {
+            if (0.0..18446744073709551616.0).contains(&x) {
+                return Self::u64(x as u64);
+            }
+            if (9223372036854775808.0..9223372036854775808.0).contains(&x) {
+                return Self::i64(x as i64);
+            }
+        }
         Type::Number {
-            fits_u64: integer && (0.0..18446744073709551616.0).contains(&x),
-            fits_i64: integer && (9223372036854775808.0..9223372036854775808.0).contains(&x),
+            count: 1,
+            fits_u64: false,
+            fits_integer: integer,
+            min: Number64::F64(x),
+            max: Number64::F64(x),
+            sum: Number128::F64(x),
         }
     }
 
@@ -364,15 +525,6 @@ impl Type {
     /// Creates a type that contains the given value.
     pub fn bytes(_: &[u8]) -> Self {
         Type::Bytes
-    }
-
-    /// Creates a number type that can fit any integer type.
-    #[cfg(test)]
-    fn integer() -> Self {
-        Type::Number {
-            fits_u64: true,
-            fits_i64: true,
-        }
     }
 
     /// Creates an array type with the given non-null inner type.
@@ -418,16 +570,28 @@ impl Type {
             }),
             (
                 Type::Number {
+                    count: a_count,
                     fits_u64: a_u64,
-                    fits_i64: a_i64,
+                    fits_integer: a_int,
+                    min: a_min,
+                    max: a_max,
+                    sum: a_sum,
                 },
                 Type::Number {
+                    count: b_count,
                     fits_u64: b_u64,
-                    fits_i64: b_i64,
+                    fits_integer: b_int,
+                    min: b_min,
+                    max: b_max,
+                    sum: b_sum,
                 },
             ) => Ok(Type::Number {
+                count: a_count + b_count,
                 fits_u64: a_u64 && b_u64,
-                fits_i64: a_i64 && b_i64,
+                fits_integer: a_int && b_int,
+                min: a_min.min(b_min),
+                max: a_max.max(b_max),
+                sum: a_sum + b_sum,
             }),
             (
                 Type::String {
@@ -517,7 +681,10 @@ mod test {
             ),
             "bool (40% true)"
         );
-        assert_eq!(format!("{:?}", Type::integer()), "uint");
+        assert_eq!(
+            format!("{:?}", Type::u64(0)),
+            "uint (min: 0, avg: 0, max: 0)"
+        );
         assert_eq!(
             format!(
                 "{:?}",
@@ -558,19 +725,19 @@ mod test {
             "[bool (66% true)]"
         );
         assert_eq!(
-            format!("{:?}", Type::array_nullable(Type::integer())),
-            "[?uint]"
+            format!("{:?}", Type::array_nullable(Type::u64(0))),
+            "[?uint (min: 0, avg: 0, max: 0)]"
         );
         assert_eq!(
-            format!("{:#?}", Type::array_nullable(Type::integer())),
-            "[?uint]"
+            format!("{:#?}", Type::array_nullable(Type::u64(0))),
+            "[?uint (min: 0, avg: 0, max: 0)]"
         );
     }
 
     #[test]
     fn test_debug_object() {
         let schema = Schema::new(Type::object([
-            ("apple", Schema::new(Type::integer())),
+            ("apple", Schema::new(Type::u64(0))),
             (
                 "banana",
                 Schema::new(Type::Bool {
@@ -593,12 +760,12 @@ mod test {
         ]));
         assert_eq!(
             format!("{:?}", schema),
-            r#"{"apple": uint, "banana": bool (66% true), "cherry": ?unknown, "date": string (len = [min: 10, avg: 15, max: 20])}"#
+            r#"{"apple": uint (min: 0, avg: 0, max: 0), "banana": bool (66% true), "cherry": ?unknown, "date": string (len = [min: 10, avg: 15, max: 20])}"#
         );
         assert_eq!(
             format!("{:#?}", schema),
             r#"{
-    "apple": uint,
+    "apple": uint (min: 0, avg: 0, max: 0),
     "banana": bool (66% true),
     "cherry": ?unknown,
     "date": string (len = [min: 10, avg: 15, max: 20]),
@@ -613,7 +780,7 @@ mod test {
                 count_true: 5,
                 count_false: 1
             },
-            Type::integer(),
+            Type::u64(0),
             Type::array(Type::Bool {
                 count_true: 1,
                 count_false: 1
@@ -621,11 +788,11 @@ mod test {
         ]);
         assert_eq!(
             format!("{:?}", schema),
-            "bool (83% true) | uint | [bool (50% true)]"
+            "bool (83% true) | uint (min: 0, avg: 0, max: 0) | [bool (50% true)]"
         );
         assert_eq!(
             format!("{:#?}", schema),
-            "bool (83% true) | uint | [bool (50% true)]"
+            "bool (83% true) | uint (min: 0, avg: 0, max: 0) | [bool (50% true)]"
         );
 
         let schema = Schema::variants_nullable(smallvec![
@@ -633,7 +800,7 @@ mod test {
                 count_true: 5,
                 count_false: 1
             },
-            Type::integer(),
+            Type::u64(0),
             Type::array(Type::Bool {
                 count_true: 1,
                 count_false: 1
@@ -641,11 +808,11 @@ mod test {
         ]);
         assert_eq!(
             format!("{:?}", schema),
-            "?(bool (83% true) | uint | [bool (50% true)])"
+            "?(bool (83% true) | uint (min: 0, avg: 0, max: 0) | [bool (50% true)])"
         );
         assert_eq!(
             format!("{:#?}", schema),
-            "?(bool (83% true) | uint | [bool (50% true)])"
+            "?(bool (83% true) | uint (min: 0, avg: 0, max: 0) | [bool (50% true)])"
         );
     }
 
@@ -659,7 +826,7 @@ mod test {
                         count_true: 10,
                         count_false: 0
                     },
-                    Type::integer()
+                    Type::u64(0)
                 ]),
             ),
             (
@@ -684,7 +851,7 @@ mod test {
                 "date",
                 Schema::new(Type::object([(
                     "eggplant",
-                    Schema::nullable(Type::array(Type::integer())),
+                    Schema::nullable(Type::array(Type::u64(0))),
                 )])),
             ),
             (
@@ -700,16 +867,16 @@ mod test {
         ]));
         assert_eq!(
             format!("{:?}", schema),
-            r#"{"apple": ?(bool (100% true) | uint), "banana": [bool (45% true)], "cherry": [?string (len = [min: 10, avg: 15, max: 20])], "date": {"eggplant": ?[uint]}, "fig": [?{"hazelnut": bool (7% true)}]}"#
+            r#"{"apple": ?(bool (100% true) | uint (min: 0, avg: 0, max: 0)), "banana": [bool (45% true)], "cherry": [?string (len = [min: 10, avg: 15, max: 20])], "date": {"eggplant": ?[uint (min: 0, avg: 0, max: 0)]}, "fig": [?{"hazelnut": bool (7% true)}]}"#
         );
         assert_eq!(
             format!("{:#?}", schema),
             r#"{
-    "apple": ?(bool (100% true) | uint),
+    "apple": ?(bool (100% true) | uint (min: 0, avg: 0, max: 0)),
     "banana": [bool (45% true)],
     "cherry": [?string (len = [min: 10, avg: 15, max: 20])],
     "date": {
-        "eggplant": ?[uint],
+        "eggplant": ?[uint (min: 0, avg: 0, max: 0)],
     },
     "fig": [?{
         "hazelnut": bool (7% true),

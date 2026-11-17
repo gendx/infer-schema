@@ -1,7 +1,7 @@
 {
     "features": [{
         "geometry": {
-            "coordinates": [[[number]]],
+            "coordinates": [[[number (min: -141.002991, avg: -11.38825395392614, max: 83.11387600000012)]]],
             "type": string (len = [min: 7, avg: 7, max: 7]),
         },
         "properties": {

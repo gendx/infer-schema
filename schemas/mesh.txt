@@ -1,14 +1,14 @@
 {
     "batches": [{
-        "indexRange": [uint],
-        "usedBones": [uint],
-        "vertexRange": [uint],
+        "indexRange": [uint (min: 0, avg: 16704, max: 33408)],
+        "usedBones": [uint (min: 22, avg: 22, max: 22)],
+        "vertexRange": [uint (min: 0, avg: 1800, max: 3600)],
     }],
-    "colors": [uint],
-    "indices": [uint],
-    "influences": [[number]],
+    "colors": [uint (min: 4278190080, avg: 4278190080, max: 4278190080)],
+    "indices": [uint (min: 0, avg: 1811, max: 3599)],
+    "influences": [[uint (min: 0, avg: 0, max: 1)]],
     "morphTargets": {},
-    "normals": [number],
-    "positions": [number],
-    "tex0": [number],
+    "normals": [number (min: -0.999668061733, avg: 0.07813602276525623, max: 0.999653041363)],
+    "positions": [number (min: -0.18136537075, avg: 0.7563851844822985, max: 2.38296031952)],
+    "tex0": [number (min: 0, avg: 0.3429830191543996, max: 1)],
 }
