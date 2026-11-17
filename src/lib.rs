@@ -5,6 +5,7 @@
 
 #[cfg(feature = "serde-json")]
 use serde_json::Value;
+use smallvec::{SmallVec, smallvec};
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
@@ -17,7 +18,7 @@ use std::ops::Add;
 #[derive(Clone, PartialEq, Eq)]
 pub struct Schema {
     nullable: bool,
-    types: Vec<Type>,
+    types: SmallVec<[Type; 1]>,
 }
 
 impl Debug for Schema {
@@ -59,9 +60,9 @@ impl Schema {
                 fits_i64: x.is_i64(),
             }),
             Value::String(s) => Schema::new(Type::string(s)),
-            Value::Array(a) => {
-                Schema::new(Type::Array(Schema::unify_all(a.iter().map(Schema::infer))))
-            }
+            Value::Array(a) => Schema::new(Type::Array(Box::new(Schema::unify_all(
+                a.iter().map(Schema::infer),
+            )))),
             Value::Object(o) => Schema::new(Type::Object(
                 o.iter()
                     .map(|(k, v)| (k.clone(), Schema::infer(v)))
@@ -82,7 +83,7 @@ impl Schema {
     pub fn new(typ: Type) -> Self {
         Schema {
             nullable: false,
-            types: vec![typ],
+            types: smallvec![typ],
         }
     }
 
@@ -90,7 +91,7 @@ impl Schema {
     pub fn nullable(typ: Type) -> Self {
         Schema {
             nullable: true,
-            types: vec![typ],
+            types: smallvec![typ],
         }
     }
 
@@ -98,7 +99,7 @@ impl Schema {
     pub fn unknown() -> Self {
         Schema {
             nullable: false,
-            types: vec![],
+            types: smallvec![],
         }
     }
 
@@ -106,15 +107,14 @@ impl Schema {
     pub fn null() -> Self {
         Schema {
             nullable: true,
-            types: vec![],
+            types: smallvec![],
         }
     }
 
     /// Creates a JSON schema with the given non-null types.
     #[cfg(test)]
     #[track_caller]
-    fn variants(types: impl Into<Vec<Type>>) -> Self {
-        let types = types.into();
+    fn variants(types: SmallVec<[Type; 1]>) -> Self {
         for [x, y] in types.array_windows() {
             assert!(
                 x.discriminant() < y.discriminant(),
@@ -130,8 +130,7 @@ impl Schema {
     /// Creates a JSON schema with the given nullable types.
     #[cfg(test)]
     #[track_caller]
-    fn variants_nullable(types: impl Into<Vec<Type>>) -> Self {
-        let types = types.into();
+    fn variants_nullable(types: SmallVec<[Type; 1]>) -> Self {
         for [x, y] in types.array_windows() {
             assert!(
                 x.discriminant() < y.discriminant(),
@@ -151,7 +150,7 @@ impl Schema {
             (false, false) => Type::unify_types(x.types, y.types),
             (false, true) => x.types,
             (true, false) => y.types,
-            (true, true) => vec![],
+            (true, true) => smallvec![],
         };
         Schema { nullable, types }
     }
@@ -184,9 +183,9 @@ pub enum Type {
     /// Byte array.
     Bytes,
     /// Array.
-    Array(Schema),
+    Array(Box<Schema>),
     /// Map.
-    Map(Schema),
+    Map(Box<Schema>),
     /// Object.
     Object(HashMap<String, Schema>),
 }
@@ -299,7 +298,7 @@ impl Type {
 
                     let mut schema = Schema::unify_all(extracted.into_values());
                     schema.merge_maps(threshold);
-                    *self = Type::Map(schema);
+                    *self = Type::Map(Box::new(schema));
                     true
                 }
             }
@@ -356,13 +355,13 @@ impl Type {
     /// Creates an array type with the given non-null inner type.
     #[cfg(test)]
     fn array(inner: Type) -> Self {
-        Type::Array(Schema::new(inner))
+        Type::Array(Box::new(Schema::new(inner)))
     }
 
     /// Creates an array type with the given nullable inner type.
     #[cfg(test)]
     fn array_nullable(inner: Type) -> Self {
-        Type::Array(Schema::nullable(inner))
+        Type::Array(Box::new(Schema::nullable(inner)))
     }
 
     /// Creates an object type with the given non-optional fields.
@@ -408,8 +407,8 @@ impl Type {
                 len: len1 + len2,
             }),
             (Type::Bytes, Type::Bytes) => Ok(Type::Bytes),
-            (Type::Array(a), Type::Array(b)) => Ok(Type::Array(Schema::unify(a, b))),
-            (Type::Map(a), Type::Map(b)) => Ok(Type::Map(Schema::unify(a, b))),
+            (Type::Array(a), Type::Array(b)) => Ok(Type::Array(Box::new(Schema::unify(*a, *b)))),
+            (Type::Map(a), Type::Map(b)) => Ok(Type::Map(Box::new(Schema::unify(*a, *b)))),
             (Type::Object(o), Type::Object(p)) => {
                 let mut tmp: HashMap<String, (Schema, bool)> =
                     o.into_iter().map(|(k, v)| (k, (v, false))).collect();
@@ -444,8 +443,8 @@ impl Type {
     }
 
     /// Unifies the given type variants.
-    fn unify_types(x: Vec<Self>, y: Vec<Self>) -> Vec<Self> {
-        let mut result = Vec::with_capacity(x.len() + y.len());
+    fn unify_types(x: SmallVec<[Self; 1]>, y: SmallVec<[Self; 1]>) -> SmallVec<[Self; 1]> {
+        let mut result = SmallVec::with_capacity(x.len().max(y.len()));
         let mut itx = x.into_iter().peekable();
         let mut ity = y.into_iter().peekable();
         loop {
@@ -540,12 +539,19 @@ mod test {
 
     #[test]
     fn test_debug_variants() {
-        let schema = Schema::variants([Type::Bool, Type::integer(), Type::array(Type::Bool)]);
+        let schema = Schema::variants(smallvec![
+            Type::Bool,
+            Type::integer(),
+            Type::array(Type::Bool)
+        ]);
         assert_eq!(format!("{:?}", schema), "bool | uint | [bool]");
         assert_eq!(format!("{:#?}", schema), "bool | uint | [bool]");
 
-        let schema =
-            Schema::variants_nullable([Type::Bool, Type::integer(), Type::array(Type::Bool)]);
+        let schema = Schema::variants_nullable(smallvec![
+            Type::Bool,
+            Type::integer(),
+            Type::array(Type::Bool)
+        ]);
         assert_eq!(format!("{:?}", schema), "?(bool | uint | [bool])");
         assert_eq!(format!("{:#?}", schema), "?(bool | uint | [bool])");
     }
@@ -555,7 +561,7 @@ mod test {
         let schema = Schema::new(Type::object([
             (
                 "apple",
-                Schema::variants_nullable([Type::Bool, Type::integer()]),
+                Schema::variants_nullable(smallvec![Type::Bool, Type::integer()]),
             ),
             ("banana", Schema::new(Type::array(Type::Bool))),
             (

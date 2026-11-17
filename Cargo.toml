@@ -21,6 +21,7 @@ serde-json = ["dep:serde_json"]
 
 [dependencies]
 serde_json = { optional = true, version = "1.0.154" }
+smallvec = { version = "1.16.5", features = ["union"] }
 
 [dev-dependencies]
 anyhow = "1.0.104"
