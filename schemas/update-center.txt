@@ -13,7 +13,7 @@
         "compatibleSinceVersion": ?string (len = [min: 3, avg: 3, max: 3]),
         "dependencies": [{
             "name": string (len = [min: 3, avg: 10, max: 22]),
-            "optional": bool,
+            "optional": bool (34% true),
             "version": string (len = [min: 3, avg: 4, max: 7]),
         }],
         "developers": [{

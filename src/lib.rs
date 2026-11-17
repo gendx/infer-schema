@@ -54,7 +54,7 @@ impl Schema {
     pub fn infer(value: &Value) -> Self {
         match value {
             Value::Null => Schema::null(),
-            Value::Bool(_) => Schema::new(Type::Bool),
+            Value::Bool(x) => Schema::new(Type::bool(*x)),
             Value::Number(x) => Schema::new(Type::Number {
                 fits_u64: x.is_u64(),
                 fits_i64: x.is_i64(),
@@ -165,7 +165,12 @@ impl Schema {
 #[derive(Clone, PartialEq, Eq)]
 pub enum Type {
     /// Boolean.
-    Bool,
+    Bool {
+        /// Number of observed [`true`] values.
+        count_true: u64,
+        /// Number of observed [`false`] values.
+        count_false: u64,
+    },
     /// Number.
     Number {
         /// Whether this number fits in a [`u64`].
@@ -226,7 +231,13 @@ impl Add for Stats {
 impl Debug for Type {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Type::Bool => fmt.write_str("bool"),
+            Type::Bool {
+                count_true,
+                count_false,
+            } => fmt.write_fmt(format_args!(
+                "bool ({}% true)",
+                *count_true as u128 * 100 / (count_true + count_false) as u128,
+            )),
             Type::Number {
                 fits_u64: true,
                 fits_i64: _,
@@ -269,7 +280,7 @@ impl Type {
     // This is needed because core::mem::Discriminant doesn't implement Ord.
     fn discriminant(&self) -> usize {
         match self {
-            Type::Bool => 0,
+            Type::Bool { .. } => 0,
             Type::Number { .. } => 1,
             Type::String { .. } => 2,
             Type::Bytes => 3,
@@ -282,7 +293,7 @@ impl Type {
     /// Converts objects with at least `threshold` keys into maps.
     pub fn merge_maps(&mut self, threshold: usize) -> bool {
         match self {
-            Type::Bool | Type::Number { .. } | Type::String { .. } | Type::Bytes => false,
+            Type::Bool { .. } | Type::Number { .. } | Type::String { .. } | Type::Bytes => false,
             Type::Array(schema) | Type::Map(schema) => schema.merge_maps(threshold),
             Type::Object(map) => {
                 if map.len() < threshold {
@@ -298,6 +309,21 @@ impl Type {
                     *self = Type::Map(Box::new(schema));
                     true
                 }
+            }
+        }
+    }
+
+    /// Creates a type that contains the given value.
+    pub fn bool(x: bool) -> Self {
+        if x {
+            Type::Bool {
+                count_true: 1,
+                count_false: 0,
+            }
+        } else {
+            Type::Bool {
+                count_true: 0,
+                count_false: 1,
             }
         }
     }
@@ -377,7 +403,19 @@ impl Type {
     #[expect(clippy::result_large_err)]
     fn unify(x: Self, y: Self) -> Result<Self, (Self, Self)> {
         match (x, y) {
-            (Type::Bool, Type::Bool) => Ok(Type::Bool),
+            (
+                Type::Bool {
+                    count_true: a_count_true,
+                    count_false: a_count_false,
+                },
+                Type::Bool {
+                    count_true: b_count_true,
+                    count_false: b_count_false,
+                },
+            ) => Ok(Type::Bool {
+                count_true: a_count_true + b_count_true,
+                count_false: a_count_false + b_count_false,
+            }),
             (
                 Type::Number {
                     fits_u64: a_u64,
@@ -393,16 +431,16 @@ impl Type {
             }),
             (
                 Type::String {
-                    count: count1,
-                    len: len1,
+                    count: a_count,
+                    len: a_len,
                 },
                 Type::String {
-                    count: count2,
-                    len: len2,
+                    count: b_count,
+                    len: b_len,
                 },
             ) => Ok(Type::String {
-                count: count1 + count2,
-                len: len1 + len2,
+                count: a_count + b_count,
+                len: a_len + b_len,
             }),
             (Type::Bytes, Type::Bytes) => Ok(Type::Bytes),
             (Type::Array(a), Type::Array(b)) => Ok(Type::Array(Box::new(Schema::unify(*a, *b)))),
@@ -469,7 +507,16 @@ mod test {
 
     #[test]
     fn test_debug_base_types() {
-        assert_eq!(format!("{:?}", Type::Bool), "bool");
+        assert_eq!(
+            format!(
+                "{:?}",
+                Type::Bool {
+                    count_true: 2,
+                    count_false: 3
+                }
+            ),
+            "bool (40% true)"
+        );
         assert_eq!(format!("{:?}", Type::integer()), "uint");
         assert_eq!(
             format!(
@@ -490,8 +537,26 @@ mod test {
 
     #[test]
     fn test_debug_array() {
-        assert_eq!(format!("{:?}", Type::array(Type::Bool)), "[bool]");
-        assert_eq!(format!("{:#?}", Type::array(Type::Bool)), "[bool]");
+        assert_eq!(
+            format!(
+                "{:?}",
+                Type::array(Type::Bool {
+                    count_true: 2,
+                    count_false: 5
+                })
+            ),
+            "[bool (28% true)]"
+        );
+        assert_eq!(
+            format!(
+                "{:#?}",
+                Type::array(Type::Bool {
+                    count_true: 4,
+                    count_false: 2
+                })
+            ),
+            "[bool (66% true)]"
+        );
         assert_eq!(
             format!("{:?}", Type::array_nullable(Type::integer())),
             "[?uint]"
@@ -506,7 +571,13 @@ mod test {
     fn test_debug_object() {
         let schema = Schema::new(Type::object([
             ("apple", Schema::new(Type::integer())),
-            ("banana", Schema::new(Type::Bool)),
+            (
+                "banana",
+                Schema::new(Type::Bool {
+                    count_true: 4,
+                    count_false: 2,
+                }),
+            ),
             ("cherry", Schema::null()),
             (
                 "date",
@@ -522,13 +593,13 @@ mod test {
         ]));
         assert_eq!(
             format!("{:?}", schema),
-            r#"{"apple": uint, "banana": bool, "cherry": ?unknown, "date": string (len = [min: 10, avg: 15, max: 20])}"#
+            r#"{"apple": uint, "banana": bool (66% true), "cherry": ?unknown, "date": string (len = [min: 10, avg: 15, max: 20])}"#
         );
         assert_eq!(
             format!("{:#?}", schema),
             r#"{
     "apple": uint,
-    "banana": bool,
+    "banana": bool (66% true),
     "cherry": ?unknown,
     "date": string (len = [min: 10, avg: 15, max: 20]),
 }"#
@@ -538,20 +609,44 @@ mod test {
     #[test]
     fn test_debug_variants() {
         let schema = Schema::variants(smallvec![
-            Type::Bool,
+            Type::Bool {
+                count_true: 5,
+                count_false: 1
+            },
             Type::integer(),
-            Type::array(Type::Bool)
+            Type::array(Type::Bool {
+                count_true: 1,
+                count_false: 1
+            })
         ]);
-        assert_eq!(format!("{:?}", schema), "bool | uint | [bool]");
-        assert_eq!(format!("{:#?}", schema), "bool | uint | [bool]");
+        assert_eq!(
+            format!("{:?}", schema),
+            "bool (83% true) | uint | [bool (50% true)]"
+        );
+        assert_eq!(
+            format!("{:#?}", schema),
+            "bool (83% true) | uint | [bool (50% true)]"
+        );
 
         let schema = Schema::variants_nullable(smallvec![
-            Type::Bool,
+            Type::Bool {
+                count_true: 5,
+                count_false: 1
+            },
             Type::integer(),
-            Type::array(Type::Bool)
+            Type::array(Type::Bool {
+                count_true: 1,
+                count_false: 1
+            })
         ]);
-        assert_eq!(format!("{:?}", schema), "?(bool | uint | [bool])");
-        assert_eq!(format!("{:#?}", schema), "?(bool | uint | [bool])");
+        assert_eq!(
+            format!("{:?}", schema),
+            "?(bool (83% true) | uint | [bool (50% true)])"
+        );
+        assert_eq!(
+            format!("{:#?}", schema),
+            "?(bool (83% true) | uint | [bool (50% true)])"
+        );
     }
 
     #[test]
@@ -559,9 +654,21 @@ mod test {
         let schema = Schema::new(Type::object([
             (
                 "apple",
-                Schema::variants_nullable(smallvec![Type::Bool, Type::integer()]),
+                Schema::variants_nullable(smallvec![
+                    Type::Bool {
+                        count_true: 10,
+                        count_false: 0
+                    },
+                    Type::integer()
+                ]),
             ),
-            ("banana", Schema::new(Type::array(Type::Bool))),
+            (
+                "banana",
+                Schema::new(Type::array(Type::Bool {
+                    count_true: 5,
+                    count_false: 6,
+                })),
+            ),
             (
                 "cherry",
                 Schema::new(Type::array_nullable(Type::String {
@@ -584,25 +691,28 @@ mod test {
                 "fig",
                 Schema::new(Type::array_nullable(Type::object([(
                     "hazelnut",
-                    Schema::new(Type::Bool),
+                    Schema::new(Type::Bool {
+                        count_true: 1,
+                        count_false: 13,
+                    }),
                 )]))),
             ),
         ]));
         assert_eq!(
             format!("{:?}", schema),
-            r#"{"apple": ?(bool | uint), "banana": [bool], "cherry": [?string (len = [min: 10, avg: 15, max: 20])], "date": {"eggplant": ?[uint]}, "fig": [?{"hazelnut": bool}]}"#
+            r#"{"apple": ?(bool (100% true) | uint), "banana": [bool (45% true)], "cherry": [?string (len = [min: 10, avg: 15, max: 20])], "date": {"eggplant": ?[uint]}, "fig": [?{"hazelnut": bool (7% true)}]}"#
         );
         assert_eq!(
             format!("{:#?}", schema),
             r#"{
-    "apple": ?(bool | uint),
-    "banana": [bool],
+    "apple": ?(bool (100% true) | uint),
+    "banana": [bool (45% true)],
     "cherry": [?string (len = [min: 10, avg: 15, max: 20])],
     "date": {
         "eggplant": ?[uint],
     },
     "fig": [?{
-        "hazelnut": bool,
+        "hazelnut": bool (7% true),
     }],
 }"#
         );

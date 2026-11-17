@@ -2,10 +2,10 @@
     "graphstate": ?unknown,
     "instruments": [{
         "default_filter_cutoff": uint,
-        "default_filter_cutoff_enabled": bool,
+        "default_filter_cutoff_enabled": bool (20% true),
         "default_filter_mode": uint,
         "default_filter_resonance": uint,
-        "default_filter_resonance_enabled": bool,
+        "default_filter_resonance_enabled": bool (6% true),
         "default_pan": uint,
         "duplicate_check_type": uint,
         "duplicate_note_action": uint,
