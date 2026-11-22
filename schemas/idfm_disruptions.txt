@@ -26,7 +26,7 @@
         "tags": ?[string (len = [min: 10, avg: 10, max: 10])],
         "title": string (len = [min: 7, avg: 54, max: 205]),
     }],
-    "lastUpdatedDate": string (len = [min: 24, avg: 24, max: 24]),
+    "lastUpdatedDate": string (100% timestamp, len = [min: 24, avg: 24, max: 24]),
     "lines": [{
         "id": string (len = [min: 16, avg: 16, max: 16]),
         "impactedObjects": [{

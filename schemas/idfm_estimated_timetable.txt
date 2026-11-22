@@ -24,8 +24,8 @@
                         },
                         "EstimatedCalls": {
                             "EstimatedCall": [{
-                                "AimedArrivalTime": ?string (len = [min: 24, avg: 24, max: 24]),
-                                "AimedDepartureTime": ?string (len = [min: 24, avg: 24, max: 24]),
+                                "AimedArrivalTime": ?string (100% timestamp, len = [min: 24, avg: 24, max: 24]),
+                                "AimedDepartureTime": ?string (100% timestamp, len = [min: 24, avg: 24, max: 24]),
                                 "ArrivalPlatformName": ?{
                                     "value": string (len = [min: 1, avg: 1, max: 7]),
                                 },
@@ -53,8 +53,8 @@
                                 "DestinationDisplay": [{
                                     "value": string (len = [min: 2, avg: 17, max: 53]),
                                 }],
-                                "ExpectedArrivalTime": ?string (len = [min: 24, avg: 24, max: 24]),
-                                "ExpectedDepartureTime": ?string (len = [min: 24, avg: 24, max: 24]),
+                                "ExpectedArrivalTime": ?string (100% timestamp, len = [min: 24, avg: 24, max: 24]),
+                                "ExpectedDepartureTime": ?string (100% timestamp, len = [min: 24, avg: 24, max: 24]),
                                 "StopPointRef": {
                                     "value": string (len = [min: 22, avg: 23, max: 33]),
                                 },
@@ -82,7 +82,7 @@
                         "PublishedLineName": [{
                             "value": string (len = [min: 1, avg: 3, max: 30]),
                         }],
-                        "RecordedAtTime": string (len = [min: 24, avg: 24, max: 24]),
+                        "RecordedAtTime": string (100% timestamp, len = [min: 24, avg: 24, max: 24]),
                         "RouteRef": {
                             "value": ?string (len = [min: 24, avg: 34, max: 62]),
                         },
@@ -93,13 +93,13 @@
                         "VehicleMode": [string (len = [min: 3, avg: 3, max: 5])],
                     }],
                 }],
-                "ResponseTimestamp": string (len = [min: 24, avg: 24, max: 24]),
+                "ResponseTimestamp": string (100% timestamp, len = [min: 24, avg: 24, max: 24]),
                 "Status": string (len = [min: 4, avg: 4, max: 4]),
                 "Version": string (len = [min: 3, avg: 3, max: 3]),
             }],
             "ProducerRef": string (len = [min: 8, avg: 8, max: 8]),
             "ResponseMessageIdentifier": string (len = [min: 66, avg: 66, max: 66]),
-            "ResponseTimestamp": string (len = [min: 24, avg: 24, max: 24]),
+            "ResponseTimestamp": string (100% timestamp, len = [min: 24, avg: 24, max: 24]),
         },
     },
 }

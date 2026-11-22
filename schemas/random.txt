@@ -5,7 +5,7 @@
         "admin": bool (49% true),
         "age": uint (min: 18, avg: 38, max: 60),
         "avatar": string (len = [min: 17, avg: 18, max: 20]),
-        "birthDate": string (len = [min: 29, avg: 29, max: 29]),
+        "birthDate": string (100% timestamp, len = [min: 29, avg: 29, max: 29]),
         "company": string (len = [min: 5, avg: 8, max: 14]),
         "email": string (len = [min: 14, avg: 19, max: 26]),
         "field": string (len = [min: 11, avg: 11, max: 11]),

@@ -202,6 +202,9 @@ pub enum Type {
         /// Number of strings that match a UUID (RFC 9562).
         #[cfg(feature = "regex")]
         count_uuid: usize,
+        /// Number of strings that match a timestamp (e.g. RFC 3339).
+        #[cfg(feature = "regex")]
+        count_timestamp: usize,
     },
     /// Byte array.
     Bytes,
@@ -400,6 +403,8 @@ impl Debug for Type {
                 len,
                 #[cfg(feature = "regex")]
                 count_uuid,
+                #[cfg(feature = "regex")]
+                count_timestamp,
             } => {
                 #[cfg(feature = "regex")]
                 {
@@ -408,6 +413,12 @@ impl Debug for Type {
                         fmt.write_fmt(format_args!(
                             "{}% uuid, ",
                             *count_uuid as u128 * 100 / *count as u128,
+                        ))?;
+                    }
+                    if *count_timestamp != 0 {
+                        fmt.write_fmt(format_args!(
+                            "{}% timestamp, ",
+                            *count_timestamp as u128 * 100 / *count as u128,
                         ))?;
                     }
                     fmt.write_fmt(format_args!(
@@ -556,14 +567,49 @@ impl Type {
             .unwrap()
         });
 
+        // See https://datatracker.ietf.org/doc/html/rfc3339#section-5.6.
+        //
+        // This is an approximate regex that doesn't account for:
+        // - the length of each month,
+        // - leap years,
+        // - when leap seconds are allowed in the year,
+        // - when leap seconds have actually occurred.
+        //
+        // It therefore accepts invalid timestamps but shouldn't reject any
+        // valid one.
         #[cfg(feature = "regex")]
-        let count_uuid = if RE_UUID.is_match(s) { 1 } else { 0 };
+        static RE_TIMESTAMP_RFC3339: LazyLock<Regex> = LazyLock::new(|| {
+            Regex::new(
+                r"^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])[Tt]([01][0-9]|2[0-3]):[0-5][0-9]:([0-5][0-9]|60)(\.[0-9]+)?([Zz]|[+-]([01][0-9]|2[0-3]):[0-5][0-9])$",
+            )
+            .unwrap()
+        });
+
+        // See https://datatracker.ietf.org/doc/html/rfc2822#section-3.3.
+        #[cfg(feature = "regex")]
+        static RE_TIMESTAMP_RFC2822: LazyLock<Regex> = LazyLock::new(|| {
+            Regex::new(
+                r"^(Mon|Tue|Wed|Thu|Fri|Sat|Sun), (0?[1-9]|[12][0-9]|3[01]) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) [0-9]{4} ([01][0-9]|2[0-3]):[0-5][0-9]:([0-5][0-9]|60) (GMT|[+-]([01][0-9]|2[0-3])[0-5][0-9])$",
+            )
+            .unwrap()
+        });
+
+        #[cfg(feature = "regex")]
+        let (count_uuid, count_timestamp) = if RE_UUID.is_match(s) {
+            (1, 0)
+        } else if RE_TIMESTAMP_RFC3339.is_match(s) || RE_TIMESTAMP_RFC2822.is_match(s) {
+            (0, 1)
+        } else {
+            (0, 0)
+        };
 
         Type::String {
             count: 1,
             len: Stats::new(s.len() as u64),
             #[cfg(feature = "regex")]
             count_uuid,
+            #[cfg(feature = "regex")]
+            count_timestamp,
         }
     }
 
@@ -644,18 +690,24 @@ impl Type {
                     len: a_len,
                     #[cfg(feature = "regex")]
                         count_uuid: a_uuid,
+                    #[cfg(feature = "regex")]
+                        count_timestamp: a_timestamp,
                 },
                 Type::String {
                     count: b_count,
                     len: b_len,
                     #[cfg(feature = "regex")]
                         count_uuid: b_uuid,
+                    #[cfg(feature = "regex")]
+                        count_timestamp: b_timestamp,
                 },
             ) => Ok(Type::String {
                 count: a_count + b_count,
                 len: a_len + b_len,
                 #[cfg(feature = "regex")]
                 count_uuid: a_uuid + b_uuid,
+                #[cfg(feature = "regex")]
+                count_timestamp: a_timestamp + b_timestamp,
             }),
             (Type::Bytes, Type::Bytes) => Ok(Type::Bytes),
             (Type::Array(a), Type::Array(b)) => Ok(Type::Array(Box::new(Schema::unify(*a, *b)))),
@@ -763,9 +815,10 @@ mod test {
                         sum: 75
                     },
                     count_uuid: 1,
+                    count_timestamp: 2,
                 }
             ),
-            "string (20% uuid, len = [min: 10, avg: 15, max: 20])"
+            "string (20% uuid, 40% timestamp, len = [min: 10, avg: 15, max: 20])"
         );
         assert_eq!(format!("{:?}", Type::Bytes), "bytes");
     }
@@ -825,6 +878,8 @@ mod test {
                     },
                     #[cfg(feature = "regex")]
                     count_uuid: 0,
+                    #[cfg(feature = "regex")]
+                    count_timestamp: 0,
                 }),
             ),
         ]));
@@ -917,6 +972,8 @@ mod test {
                     },
                     #[cfg(feature = "regex")]
                     count_uuid: 0,
+                    #[cfg(feature = "regex")]
+                    count_timestamp: 0,
                 })),
             ),
             (
