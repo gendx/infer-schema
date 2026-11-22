@@ -17,9 +17,11 @@ rustdoc-args = ["--cfg", "docsrs", "--generate-link-to-definition"]
 
 [features]
 default = []
+regex = ["dep:regex"]
 serde-json = ["dep:serde_json"]
 
 [dependencies]
+regex = { optional = true, version = "1.13.1" }
 serde_json = { optional = true, version = "1.0.154" }
 smallvec = { version = "1.16.5", features = ["union"] }
 

@@ -3,6 +3,8 @@
 #![forbid(missing_docs, unsafe_code)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
+#[cfg(feature = "regex")]
+use regex::Regex;
 #[cfg(feature = "serde-json")]
 use serde_json::Value;
 use smallvec::{SmallVec, smallvec};
@@ -11,6 +13,8 @@ use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 use std::fmt::{Debug, Display};
 use std::ops::Add;
+#[cfg(feature = "regex")]
+use std::sync::LazyLock;
 
 /// Schema representing a top-level value. This combines a set of possible
 /// [`Type`] variants with a nullability flag. This is also the inner type of an
@@ -195,6 +199,9 @@ pub enum Type {
         count: u64,
         /// Statistics about the string length.
         len: Stats,
+        /// Number of strings that match a UUID (RFC 9562).
+        #[cfg(feature = "regex")]
+        count_uuid: usize,
     },
     /// Byte array.
     Bytes,
@@ -388,12 +395,36 @@ impl Debug for Type {
                 sum.average(*count),
                 max
             )),
-            Type::String { count, len } => fmt.write_fmt(format_args!(
-                "string (len = [min: {}, avg: {}, max: {}])",
-                len.min,
-                len.sum / *count as u128,
-                len.max
-            )),
+            Type::String {
+                count,
+                len,
+                #[cfg(feature = "regex")]
+                count_uuid,
+            } => {
+                #[cfg(feature = "regex")]
+                {
+                    fmt.write_str("string (")?;
+                    if *count_uuid != 0 {
+                        fmt.write_fmt(format_args!(
+                            "{}% uuid, ",
+                            *count_uuid as u128 * 100 / *count as u128,
+                        ))?;
+                    }
+                    fmt.write_fmt(format_args!(
+                        "len = [min: {}, avg: {}, max: {}])",
+                        len.min,
+                        len.sum / *count as u128,
+                        len.max
+                    ))
+                }
+                #[cfg(not(feature = "regex"))]
+                fmt.write_fmt(format_args!(
+                    "string (len = [min: {}, avg: {}, max: {}])",
+                    len.min,
+                    len.sum / *count as u128,
+                    len.max
+                ))
+            }
             Type::Bytes => fmt.write_str("bytes"),
             Type::Array(a) => {
                 fmt.write_str("[")?;
@@ -516,9 +547,23 @@ impl Type {
 
     /// Creates a type that contains the given value.
     pub fn string(s: &str) -> Self {
+        // See https://datatracker.ietf.org/doc/html/rfc9562#section-4.
+        #[cfg(feature = "regex")]
+        static RE_UUID: LazyLock<Regex> = LazyLock::new(|| {
+            Regex::new(
+                "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            )
+            .unwrap()
+        });
+
+        #[cfg(feature = "regex")]
+        let count_uuid = if RE_UUID.is_match(s) { 1 } else { 0 };
+
         Type::String {
             count: 1,
             len: Stats::new(s.len() as u64),
+            #[cfg(feature = "regex")]
+            count_uuid,
         }
     }
 
@@ -597,14 +642,20 @@ impl Type {
                 Type::String {
                     count: a_count,
                     len: a_len,
+                    #[cfg(feature = "regex")]
+                        count_uuid: a_uuid,
                 },
                 Type::String {
                     count: b_count,
                     len: b_len,
+                    #[cfg(feature = "regex")]
+                        count_uuid: b_uuid,
                 },
             ) => Ok(Type::String {
                 count: a_count + b_count,
                 len: a_len + b_len,
+                #[cfg(feature = "regex")]
+                count_uuid: a_uuid + b_uuid,
             }),
             (Type::Bytes, Type::Bytes) => Ok(Type::Bytes),
             (Type::Array(a), Type::Array(b)) => Ok(Type::Array(Box::new(Schema::unify(*a, *b)))),
@@ -685,6 +736,7 @@ mod test {
             format!("{:?}", Type::u64(0)),
             "uint (min: 0, avg: 0, max: 0)"
         );
+        #[cfg(not(feature = "regex"))]
         assert_eq!(
             format!(
                 "{:?}",
@@ -698,6 +750,22 @@ mod test {
                 }
             ),
             "string (len = [min: 10, avg: 15, max: 20])"
+        );
+        #[cfg(feature = "regex")]
+        assert_eq!(
+            format!(
+                "{:?}",
+                Type::String {
+                    count: 5,
+                    len: Stats {
+                        min: 10,
+                        max: 20,
+                        sum: 75
+                    },
+                    count_uuid: 1,
+                }
+            ),
+            "string (20% uuid, len = [min: 10, avg: 15, max: 20])"
         );
         assert_eq!(format!("{:?}", Type::Bytes), "bytes");
     }
@@ -755,6 +823,8 @@ mod test {
                         max: 20,
                         sum: 75,
                     },
+                    #[cfg(feature = "regex")]
+                    count_uuid: 0,
                 }),
             ),
         ]));
@@ -845,6 +915,8 @@ mod test {
                         max: 20,
                         sum: 75,
                     },
+                    #[cfg(feature = "regex")]
+                    count_uuid: 0,
                 })),
             ),
             (

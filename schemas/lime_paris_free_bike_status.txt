@@ -2,7 +2,7 @@
     "data": {
         "bikes": [{
             "_child_seat": ?bool (100% true),
-            "bike_id": string (len = [min: 36, avg: 36, max: 36]),
+            "bike_id": string (100% uuid, len = [min: 36, avg: 36, max: 36]),
             "current_range_meters": uint (min: 1287, avg: 50419, max: 95128),
             "is_disabled": bool (0% true),
             "is_reserved": bool (0% true),
